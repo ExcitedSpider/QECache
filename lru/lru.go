@@ -4,6 +4,7 @@ import "container/list"
 
 // Simple cache. Not safe for concurrent access
 type Cache struct {
+	// Give 0 for assuming infinite capacity
 	maxBytes  int64
 	usedBytes int64
 	// Use doubly linked list to implement LRU
