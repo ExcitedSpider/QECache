@@ -7,6 +7,7 @@ import (
 
 type String string
 
+// For using the lru, we need to meet the interface requirement
 func (d String) Len() int {
 	return len(d)
 }

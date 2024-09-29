@@ -1,6 +1,8 @@
 package lru
 
-import "container/list"
+import (
+	"container/list"
+)
 
 // Simple cache. Not safe for concurrent access
 type Cache struct {
@@ -80,39 +82,43 @@ func (c *Cache) Add(key string, value Value) {
 	} else {
 		addNew(c, key, value)
 	}
-
-	// Perform delete if overload
-	//
-	// Caveat: no strong guarantee that it always holds that { c.maxBytes >= c.usedBytes }
-	// TODO: implement strong guarantee
-	for c.maxBytes != 0 && c.maxBytes < c.usedBytes {
-		c.RemoveRLU()
-	}
 }
 
 func updateExisted(ele *list.Element, c *Cache, key string, value Value) {
+	entry := ele.Value.(*entry)
 	calcUsedBytes := func() int64 {
-		return c.usedBytes + int64(value.Len()) - int64(ele.Value.(*entry).value.Len())
+		return c.usedBytes + int64(value.Len()) - int64(entry.value.Len())
 	}
 	// Try free space if update would cause overflow
-	for newUsedBytes := calcUsedBytes(); newUsedBytes > c.maxBytes; newUsedBytes = calcUsedBytes() {
+	for newUsedBytes := calcUsedBytes(); c.maxBytes != 0 && newUsedBytes > c.maxBytes; newUsedBytes = calcUsedBytes() {
 		c.RemoveRLU()
 	}
 
 	// update the value and used bytes
-	entry := ele.Value.(*entry)
 	entry.value = value
-	c.usedBytes += int64(value.Len()) - int64(entry.value.Len())
+	c.usedBytes = int64(value.Len()) - int64(entry.value.Len())
 
 	// update its frequency
 	c.ll.MoveToFront(ele)
 }
 
 func addNew(c *Cache, key string, value Value) {
+	calcUsedBytes := func() int64 {
+		return c.usedBytes + int64(value.Len()) + int64(len(key))
+	}
+
+	for newUsedBytes := calcUsedBytes(); c.maxBytes != 0 && newUsedBytes > c.maxBytes; newUsedBytes = calcUsedBytes() {
+
+		if c.usedBytes == 0 {
+			panic("Undefined behavior: try to insert an oversized item.")
+		}
+		c.RemoveRLU()
+	}
+
 	// insert a new element
 	ele := c.ll.PushFront(&entry{key, value})
 	c.cache[key] = ele
-	c.usedBytes += int64(len(key)) + int64(value.Len())
+	c.usedBytes = calcUsedBytes()
 }
 
 func (c *Cache) Len() int {
