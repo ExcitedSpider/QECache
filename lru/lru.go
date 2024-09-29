@@ -76,19 +76,9 @@ func (c *Cache) RemoveRLU() {
 
 func (c *Cache) Add(key string, value Value) {
 	if ele, ok := c.cache[key]; ok {
-		// if there exists such a key
-		// update the value and used bytes
-		entry := ele.Value.(*entry)
-		entry.value = value
-		c.usedBytes += int64(value.Len()) - int64(entry.value.Len())
-
-		// update its frequency
-		c.ll.MoveToFront(ele)
+		updateExisted(ele, c, key, value)
 	} else {
-		// insert a new element
-		ele := c.ll.PushFront(&entry{key, value})
-		c.cache[key] = ele
-		c.usedBytes += int64(len(key)) + int64(value.Len())
+		addNew(c, key, value)
 	}
 
 	// Perform delete if overload
@@ -98,6 +88,23 @@ func (c *Cache) Add(key string, value Value) {
 	for c.maxBytes != 0 && c.maxBytes < c.usedBytes {
 		c.RemoveRLU()
 	}
+}
+
+func updateExisted(ele *list.Element, c *Cache, key string, value Value) {
+	// update the value and used bytes
+	entry := ele.Value.(*entry)
+	entry.value = value
+	c.usedBytes += int64(value.Len()) - int64(entry.value.Len())
+
+	// update its frequency
+	c.ll.MoveToFront(ele)
+}
+
+func addNew(c *Cache, key string, value Value) {
+	// insert a new element
+	ele := c.ll.PushFront(&entry{key, value})
+	c.cache[key] = ele
+	c.usedBytes += int64(len(key)) + int64(value.Len())
 }
 
 func (c *Cache) Len() int {
