@@ -91,6 +91,14 @@ func (c *Cache) Add(key string, value Value) {
 }
 
 func updateExisted(ele *list.Element, c *Cache, key string, value Value) {
+	calcUsedBytes := func() int64 {
+		return c.usedBytes + int64(value.Len()) - int64(ele.Value.(*entry).value.Len())
+	}
+	// Try free space if update would cause overflow
+	for newUsedBytes := calcUsedBytes(); newUsedBytes > c.maxBytes; newUsedBytes = calcUsedBytes() {
+		c.RemoveRLU()
+	}
+
 	// update the value and used bytes
 	entry := ele.Value.(*entry)
 	entry.value = value
