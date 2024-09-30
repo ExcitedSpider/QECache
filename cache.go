@@ -31,9 +31,10 @@ func (c *cache) get(key string) (value ByteView, ok bool) {
 		return
 	}
 
-	v, o := c.lru.Get(key)
-
-	return v.(ByteView), o
+	if v, ok := c.lru.Get(key); ok {
+		return v.(ByteView), ok
+	}
+	return
 }
 
 // the synchronized version of get
