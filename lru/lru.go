@@ -4,8 +4,8 @@ import (
 	"container/list"
 )
 
-// Simple cache. Not safe for concurrent access
-type Cache struct {
+// Simple LRU data structure (dictionary). Not safe for concurrent access
+type LRUDict struct {
 	// Give 0 for assuming infinite capacity
 	maxBytes  int64
 	usedBytes int64
@@ -32,8 +32,8 @@ type Value interface {
 	Len() int // how many bytes it takes
 }
 
-func New(maxBites int64, onEvicted func(string, Value)) *Cache {
-	return &Cache{
+func New(maxBites int64, onEvicted func(string, Value)) *LRUDict {
+	return &LRUDict{
 		maxBytes:  maxBites,
 		ll:        list.New(),
 		cache:     make(map[string]*list.Element),
@@ -42,7 +42,7 @@ func New(maxBites int64, onEvicted func(string, Value)) *Cache {
 }
 
 // Get an entry as a method on Cache
-func (c *Cache) Get(key string) (value Value, ok bool) {
+func (c *LRUDict) Get(key string) (value Value, ok bool) {
 	cacheNode, ok := c.cache[key]
 	if ok {
 		// Update the the accessed element to the front
@@ -56,7 +56,7 @@ func (c *Cache) Get(key string) (value Value, ok bool) {
 	return
 }
 
-func (c *Cache) RemoveRLU() {
+func (c *LRUDict) RemoveRLU() {
 	if rluEle := c.ll.Back(); rluEle != nil {
 		// need to remove the element from both dict and list
 
@@ -76,7 +76,7 @@ func (c *Cache) RemoveRLU() {
 	}
 }
 
-func (c *Cache) Add(key string, value Value) {
+func (c *LRUDict) Add(key string, value Value) {
 	if ele, ok := c.cache[key]; ok {
 		updateExisted(ele, c, key, value)
 	} else {
@@ -84,7 +84,7 @@ func (c *Cache) Add(key string, value Value) {
 	}
 }
 
-func updateExisted(ele *list.Element, c *Cache, key string, value Value) {
+func updateExisted(ele *list.Element, c *LRUDict, key string, value Value) {
 	entry := ele.Value.(*entry)
 	calcUsedBytes := func() int64 {
 		return c.usedBytes + int64(value.Len()) - int64(entry.value.Len())
@@ -102,7 +102,7 @@ func updateExisted(ele *list.Element, c *Cache, key string, value Value) {
 	c.ll.MoveToFront(ele)
 }
 
-func addNew(c *Cache, key string, value Value) {
+func addNew(c *LRUDict, key string, value Value) {
 	calcUsedBytes := func() int64 {
 		return c.usedBytes + int64(value.Len()) + int64(len(key))
 	}
@@ -121,6 +121,6 @@ func addNew(c *Cache, key string, value Value) {
 	c.usedBytes = calcUsedBytes()
 }
 
-func (c *Cache) Len() int {
+func (c *LRUDict) Len() int {
 	return c.ll.Len()
 }
