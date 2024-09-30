@@ -1,7 +1,7 @@
-package qecache
-
 // A structure represent the cached value
 // use byte for its universality
+package qecache
+
 type ByteView struct {
 	value []byte
 }
