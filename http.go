@@ -49,7 +49,7 @@ func (p *HTTPServer) Log(format string, v ...interface{}) {
 	log.Printf("[Server %s %s]: %s", p.basePath, p.selfIP, fmt.Sprintf(format, v...))
 }
 
-func (p *HTTPServer) serve(w http.ResponseWriter, r *http.Request) {
+func (p *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// This guard seems useless because I don't know how to handle this situation
 	if r == nil {
 		panic("Empty Request")
