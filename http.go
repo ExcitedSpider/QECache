@@ -182,7 +182,7 @@ func (s *HTTPServer) SetPeers(peerUrls ...string) {
 	}
 }
 
-func (p *HTTPServer) SelectPeer(key string) (RemotePeer, bool) {
+func (p *HTTPServer) PeerOfKey(key string) (RemotePeer, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if peer := p.peers.Get(key); peer != "" && peer != p.selfIP {

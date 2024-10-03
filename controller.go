@@ -32,6 +32,8 @@ type Controller struct {
 	fetcher Fetcher
 	// the underlying cache structure
 	mainCache cache
+	// allow loading from peers
+	peers PeerDict
 }
 
 // global variables
@@ -73,10 +75,41 @@ func (c *Controller) Get(key string) (ByteView, error) {
 		return v, nil
 	}
 
-	return c.fetchData(key)
+	return c.fetch(key)
 }
 
-func (c *Controller) fetchData(key string) (ByteView, error) {
+func (c *Controller) RegisterPeers(peers PeerDict) {
+	if c.peers != nil {
+		panic("RegisterPeerPicker called more than once")
+	}
+	c.peers = peers
+}
+
+func (c *Controller) fetch(key string) (ByteView, error) {
+	if c.peers != nil {
+		// there are registered peers
+		// we try to fetch from peers first
+		// if the key is assigned to current node, ok would be `false`
+		// this can correctly force the current node to fetch if missed
+		if peer, ok := c.peers.PeerOfKey(key); ok {
+			if value, err := c.fetchFromPeer(peer, key); err == nil {
+				return value, nil
+			}
+			log.Println("Cannot hear from peers")
+		}
+	}
+	return c.fetchLocally(key)
+}
+
+func (c *Controller) fetchFromPeer(peer RemotePeer, key string) (ByteView, error) {
+	bytes, err := peer.Get(c.name, key)
+	if err != nil {
+		return ByteView{}, err
+	}
+	return ByteView{value: bytes}, nil
+}
+
+func (c *Controller) fetchLocally(key string) (ByteView, error) {
 	bytes, err := c.fetcher.Fetch(key)
 	if err != nil {
 		return ByteView{}, err

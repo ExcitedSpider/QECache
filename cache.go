@@ -24,9 +24,9 @@ func (c *cache) add(key string, value ByteView) {
 	c.lru.Add(key, value)
 }
 
-// by default, get has no lock to protect it to improve efficiency
-// could have dirty data
 func (c *cache) get(key string) (value ByteView, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.lru == nil {
 		return
 	}
@@ -35,12 +35,4 @@ func (c *cache) get(key string) (value ByteView, ok bool) {
 		return v.(ByteView), ok
 	}
 	return
-}
-
-// the synchronized version of get
-func (c *cache) getSync(key string) (value ByteView, ok bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.get(key)
 }
