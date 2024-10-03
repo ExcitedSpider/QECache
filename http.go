@@ -2,11 +2,63 @@
 package qecache
 
 import (
+	"QECache/consistenthash"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 )
+
+// ======================================
+// HTTP Client
+// ======================================
+
+type httpClient struct {
+	baseURL string
+}
+
+func (c *httpClient) Get(cname string, key string) ([]byte, error) {
+	requestURL := fmt.Sprintf("%v%v/%v",
+		c.baseURL,
+		url.QueryEscape(cname),
+		url.QueryEscape(key),
+	)
+
+	res, error := http.Get(requestURL)
+
+	if error != nil {
+		return nil, error
+	}
+
+	defer res.Body.Close() // remember to always close request body stream
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %v", res.Status)
+	}
+
+	bytes, error := io.ReadAll(res.Body)
+
+	if error != nil {
+		return nil, fmt.Errorf("error when reading stream: %v", error)
+	}
+
+	return bytes, nil
+}
+
+// assert httpClient implements RemotePeer (force type check)
+// How this trick work?
+// for the right hand side, we created a value nil with type (*httpClient)
+// then, we assign this value to a variable _ of type RemotePeer.
+// we only needs the compiler to carry out type checker, without using
+// the variable _
+var _ RemotePeer = (*httpClient)(nil)
+
+// ======================================
+// HTTP Server
+// ======================================
 
 // Fixed value shall be declared as constants,
 // this can improve performance and prevent unintentional modification
@@ -19,6 +71,12 @@ type HTTPServer struct {
 	selfIP string
 	// the path for this server.
 	basePath string
+	mu       sync.Mutex
+	// peer information, used to get entry from peer if cache missed
+	peers consistenthash.KeyHashInfo
+	// each url has a client.
+	// which might not be so efficient but we do it anyway because it's safe
+	httpClients map[string]*httpClient
 }
 
 type HTTPServerConfig struct {
@@ -98,3 +156,35 @@ func (p *HTTPServer) handleQueryCache(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(view.ByteSlice())
 }
+
+const DEFAULT_VNODE_SCALAR = 4.
+
+// Set the peers for a server.
+// caveat: it removes old peer settings
+// Parameters:
+// - peerUrls: pass arbitrary peer's urls
+func (s *HTTPServer) SetPeers(peerUrls ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.peers = *consistenthash.New(DEFAULT_VNODE_SCALAR, nil)
+	s.peers.Add(peerUrls...)
+
+	// provide the length so that it might be more efficient
+	s.httpClients = make(map[string]*httpClient, len(peerUrls))
+	for _, peerUrl := range peerUrls {
+		s.httpClients[peerUrl] = &httpClient{baseURL: peerUrl + s.basePath}
+	}
+}
+
+func (p *HTTPServer) SelectPeer(key string) (RemotePeer, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if peer := p.peers.Get(key); peer != "" && peer != p.selfIP {
+		p.Log("Pick peer %s", peer)
+		return p.httpClients[peer], true
+	}
+	return nil, false
+}
+
+var _ PeerSelector = (*HTTPServer)(nil)
