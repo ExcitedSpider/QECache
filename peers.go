@@ -1,8 +1,8 @@
 // Get entry from peers
 package qecache
 
-// Select a peer according to the key (by hashing)
-type PeerSelector interface {
+// Keep records of peers in this dictionary
+type PeerDict interface {
 	SelectPeer(key string) (peer RemotePeer, ok bool)
 }
 

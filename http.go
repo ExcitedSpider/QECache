@@ -1,4 +1,5 @@
-// implement a small http server in this file
+// Define and implement the required HTTP server and client.
+// They delegate all the underlying network operations required by the cache
 package qecache
 
 import (
@@ -14,6 +15,8 @@ import (
 
 // ======================================
 // HTTP Client
+// It mainly used to get entry from peers
+// Thus we require it to implement RemotePeer
 // ======================================
 
 type httpClient struct {
@@ -58,6 +61,8 @@ var _ RemotePeer = (*httpClient)(nil)
 
 // ======================================
 // HTTP Server
+// Serve a set of API that allows peers (and maybe admins) to query what
+// the cache holds
 // ======================================
 
 // Fixed value shall be declared as constants,
@@ -187,4 +192,4 @@ func (p *HTTPServer) SelectPeer(key string) (RemotePeer, bool) {
 	return nil, false
 }
 
-var _ PeerSelector = (*HTTPServer)(nil)
+var _ PeerDict = (*HTTPServer)(nil)
