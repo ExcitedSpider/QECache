@@ -1,3 +1,7 @@
-A distributed cache.
+# QECache
 
-Shout out to https://github.com/geektutu/7days-golang
+A distributed cache as part of my learning of Golang.
+Not safe for production. 
+But well-documented for learning this language.
+
+Inspired by https://github.com/golang/groupcache
