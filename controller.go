@@ -2,6 +2,7 @@
 package qecache
 
 import (
+	"QECache/singleflight"
 	"fmt"
 	"log"
 	"sync"
@@ -34,6 +35,8 @@ type Controller struct {
 	mainCache cache
 	// allow loading from peers
 	peers PeerDict
+	// single flight loader
+	sfloader *singleflight.Group
 }
 
 // global variables
@@ -58,7 +61,7 @@ func NewController(name string, maxBytes int64, getter Fetcher) *Controller {
 	mu.Lock()
 	defer mu.Unlock()
 
-	controller := &Controller{name: name, fetcher: getter, mainCache: cache{maxBytes: maxBytes}}
+	controller := &Controller{name: name, fetcher: getter, mainCache: cache{maxBytes: maxBytes}, sfloader: &singleflight.Group{}}
 	controllers[name] = controller
 
 	return controller
@@ -75,7 +78,15 @@ func (c *Controller) Get(key string) (ByteView, error) {
 		return v, nil
 	}
 
-	return c.fetch(key)
+	val, err := c.sfloader.Do(key, func() (interface{}, error) {
+		return c.fetch(key)
+	})
+
+	if err == nil {
+		return val.(ByteView), err
+	}
+
+	return ByteView{}, err
 }
 
 func (c *Controller) RegisterPeers(peers PeerDict) {
@@ -86,6 +97,7 @@ func (c *Controller) RegisterPeers(peers PeerDict) {
 }
 
 func (c *Controller) fetch(key string) (ByteView, error) {
+
 	if c.peers != nil {
 		// there are registered peers
 		// we try to fetch from peers first
